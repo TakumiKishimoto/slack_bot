@@ -1,44 +1,68 @@
+import os
+import sqlite3
+from slack import WebClient
+from slackeventsapi import SlackEventAdapter
 from flask import Flask, request, jsonify
-from slack_sdk import WebClient
-from slack_sdk.errors import SlackApiError
-from models import db, Command
 
+# Slack APIトークンを環境変数から取得します
+SLACK_BOT_TOKEN = os.environ["SLACK_BOT_TOKEN"]
+
+# Flaskアプリケーションを初期化します
 app = Flask(__name__)
-slack_token = "xoxb-5921280756961-5895039465655-TB1YEIMliW5wzUjqdo2kp8Im"
-slack_client = WebClient(token=slack_token)
 
-# スラッシュコマンドのエンドポイント
-@app.route('/commands', methods=['POST'])
-def commands():
-    data = request.json
-    if data['type'] == 'slash_commands':
-        keyword = data['text'].strip()
-        command = Command.query.filter_by(keyword=keyword).first()
-        if command:
-            response_text = command.full_command
+# Slack APIクライアントを初期化します
+slack_client = WebClient(token=SLACK_BOT_TOKEN)
+
+# Slack Event Adapterを初期化します
+slack_events_adapter = SlackEventAdapter(os.environ["SLACK_SIGNING_SECRET"], "/slack/events", app)
+
+# SQLiteデータベースに接続
+def get_db_connection():
+    conn = sqlite3.connect("my_database.db")
+    return conn
+
+# スラッシュコマンドのエンドポイントを設定します
+@app.route("/slack/command", methods=["POST"])
+def handle_command():
+    # スラッシュコマンドのリクエストを受け取ります
+    command_text = request.form.get("text")
+
+    if command_text.startswith("add "):
+        # 語句とキーワードをデータベースに追加
+        parts = command_text[4:].split(" ")
+        if len(parts) >= 2:
+            keyword = parts[0]
+            phrase = " ".join(parts[1:])
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO phrases (keyword, phrase) VALUES (?, ?)", (keyword, phrase))
+            conn.commit()
+            conn.close()
+            response_text = f"キーワード '{keyword}' に語句 '{phrase}' が登録されました。"
         else:
-            response_text = "Command not found."
-
-        response = {
-            "response_type": "in_channel",
-            "text": response_text
-        }
-        return jsonify(response)
-    return jsonify({"message": "Invalid request"})
-
-@app.route('/add_command', methods=['POST'])
-def add_command():
-    data = request.json
-    keyword = data.get('keyword')
-    full_command = data.get('full_command')
-
-    if keyword and full_command:
-        command = Command(keyword=keyword, full_command=full_command)
-        db.session.add(command)
-        db.session.commit()
-        return jsonify({"message": "Command added successfully"})
+            response_text = "キーワードと語句を指定してください。"
+    elif command_text.startswith("list "):
+        # キーワードに対応する語句をデータベースから取得
+        keyword = command_text[5:]
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT phrase FROM phrases WHERE keyword=?", (keyword,))
+        phrases = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        if phrases:
+            response_text = f"{keyword} の登録語句: " + ", ".join(phrases)
+        else:
+            response_text = f"{keyword} には登録語句がありません。"
     else:
-        return jsonify({"message": "Invalid data"})
-    
-if __name__ == '__main__':
+        response_text = "不明なコマンドです"
+
+    # Slackに応答を送信します
+    response = slack_client.chat_postMessage(
+        channel=request.form["channel_id"],
+        text=response_text
+    )
+
+    return "", 200
+
+if __name__ == "__main__":
     app.run(debug=True)

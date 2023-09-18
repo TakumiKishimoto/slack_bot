@@ -1,16 +1,17 @@
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
+import sqlite3
 
-app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///commands.db'
-db = SQLAlchemy(app)
+# SQLiteデータベースに接続
+conn = sqlite3.connect("my_database.db")
+cursor = conn.cursor()
 
-class Command(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    keyword = db.Column(db.String(255), nullable=False)
-    full_command = db.Column(db.String(255), nullable=False)
-
-# アプリケーションコンテキストを手動でセットアップ
-with app.app_context():
-    db.create_all()
+# 語句を格納するテーブルを作成
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS phrases (
+        id INTEGER PRIMARY KEY,
+        keyword TEXT,
+        phrase TEXT
+    )
+""")
+conn.commit()
+conn.close()
 
