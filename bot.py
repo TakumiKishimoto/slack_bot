@@ -4,8 +4,11 @@ from slack_sdk.errors import SlackApiError
 from models import db, Command
 
 app = Flask(__name__)
-slack_token = "YOUR_SLACK_TOKEN"
+slack_token = "xoxb-5921280756961-5894677219223-wywKj8SCzouEUU65F0JHbZc2"
 slack_client = WebClient(token=slack_token)
+
+if __name__ == '__main__':
+    app.run(debug=True)
 
 # スラッシュコマンドのエンドポイント
 @app.route('/commands', methods=['POST'])
@@ -25,9 +28,6 @@ def commands():
         }
         return jsonify(response)
     return jsonify({"message": "Invalid request"})
-
-if __name__ == '__main__':
-    app.run(debug=True)
 
 @app.route('/add_command', methods=['POST'])
 def add_command():
