@@ -5,6 +5,7 @@ from slackeventsapi import SlackEventAdapter
 from flask import Flask, request, jsonify
 
 # Slack APIトークンを環境変数から取得します
+os.environ["SLACK_BOT_TOKEN"] = "xoxb-5921280756961-5894677219223-wywKj8SCzouEUU65F0JHbZc2"
 SLACK_BOT_TOKEN = os.environ["SLACK_BOT_TOKEN"]
 
 # Flaskアプリケーションを初期化します
@@ -14,6 +15,7 @@ app = Flask(__name__)
 slack_client = WebClient(token=SLACK_BOT_TOKEN)
 
 # Slack Event Adapterを初期化します
+os.environ["SLACK_SIGNING_SECRET"] = "ad352b97e84033d8d0f9a921206fdce7"
 slack_events_adapter = SlackEventAdapter(os.environ["SLACK_SIGNING_SECRET"], "/slack/events", app)
 
 # SQLiteデータベースに接続
