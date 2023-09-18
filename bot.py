@@ -39,6 +39,6 @@ def add_command():
         return jsonify({"message": "Command added successfully"})
     else:
         return jsonify({"message": "Invalid data"})
-
+    
 if __name__ == '__main__':
     app.run(debug=True)
