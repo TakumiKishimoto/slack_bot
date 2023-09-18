@@ -4,11 +4,8 @@ from slack_sdk.errors import SlackApiError
 from models import db, Command
 
 app = Flask(__name__)
-slack_token = "xoxb-5921280756961-5894677219223-wywKj8SCzouEUU65F0JHbZc2"
+slack_token = "xoxb-5921280756961-5895039465655-TB1YEIMliW5wzUjqdo2kp8Im"
 slack_client = WebClient(token=slack_token)
-
-if __name__ == '__main__':
-    app.run(debug=True)
 
 # スラッシュコマンドのエンドポイント
 @app.route('/commands', methods=['POST'])
@@ -42,3 +39,6 @@ def add_command():
         return jsonify({"message": "Command added successfully"})
     else:
         return jsonify({"message": "Invalid data"})
+
+if __name__ == '__main__':
+    app.run(debug=True)

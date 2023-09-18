@@ -10,4 +10,7 @@ class Command(db.Model):
     keyword = db.Column(db.String(255), nullable=False)
     full_command = db.Column(db.String(255), nullable=False)
 
-db.create_all()
+# アプリケーションコンテキストを手動でセットアップ
+with app.app_context():
+    db.create_all()
+
