@@ -53,6 +53,10 @@ async def commands(
     response = {"response_type": "in_channel", "text": response_text}
     return response
 
+@app.get("/commands_all")
+async def get_commands(db: Session = Depends(get_db)):
+    commands = db.query(Command).all()
+    return commands
 
 @app.post("/add_command")
 async def add_command(text: str = Form(...), db: Session = Depends(get_db)):
