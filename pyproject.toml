@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "slack-bot"
+version = "0.1.0"
+description = ""
+authors = ["naoki <u429561d@ecs.osaka-u.ac.jp>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.111.1"
+ruff = "^0.5.4"
+slack-sdk = "^3.31.0"
+pydantic = "^2.8.2"
+sqlalchemy = "^2.0.31"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
