@@ -1,16 +1,20 @@
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
-app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///commands.db'
-db = SQLAlchemy(app)
+DATABASE_URL = "sqlite:///./test.db"
 
-class Command(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    keyword = db.Column(db.String(255), nullable=False)
-    full_command = db.Column(db.String(255), nullable=False)
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# アプリケーションコンテキストを手動でセットアップ
-with app.app_context():
-    db.create_all()
+Base = declarative_base()
 
+class Command(Base):
+    __tablename__ = "commands"
+
+    id = Column(Integer, primary_key=True, index=True)
+    keyword = Column(String, unique=True, index=True, nullable=False)
+    full_command = Column(String, nullable=False)
+
+def init_db():
+    Base.metadata.create_all(bind=engine)
