@@ -5,7 +5,9 @@ from fastapi import Depends, FastAPI, Form, HTTPException
 from pydantic import BaseModel
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
 
 from models import Command, SessionLocal, init_db
 
@@ -53,10 +55,23 @@ async def commands(
     response = {"response_type": "in_channel", "text": response_text}
     return response
 
-@app.get("/commands_all")
+
+@app.post("/commands_all")
 async def get_commands(db: Session = Depends(get_db)):
-    commands = db.query(Command).all()
-    return commands
+    try:
+        commands = db.query(Command).all()
+        return commands
+    except SQLAlchemyError as e:
+        error_message = f"データベースエラーが発生しました: {str(e)}"
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR, detail=error_message
+        )
+    except Exception as e:
+        error_message = f"予期せぬエラーが発生しました: {str(e)}"
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR, detail=error_message
+        )
+
 
 @app.post("/add_command")
 async def add_command(text: str = Form(...), db: Session = Depends(get_db)):
