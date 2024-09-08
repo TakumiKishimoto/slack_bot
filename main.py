@@ -41,8 +41,8 @@ async def root():
     return {"message": "Hello, FastAPI is running!"}
 
 
-@app.post("/commands")
-async def commands(text: str = Form(...), db: Session = Depends(get_db)):
+@app.post("/command -i")
+async def command(text: str = Form(...), db: Session = Depends(get_db)):
     keyword = text.strip()
     command = db.query(Command).filter(Command.keyword == keyword).first()
     if command:
@@ -53,21 +53,42 @@ async def commands(text: str = Form(...), db: Session = Depends(get_db)):
     response = {"response_type": "in_channel", "text": response_text}
     return response
 
+@app.post("/command")
+async def command(text: str = Form(...), db: Session = Depends(get_db)):
+    keyword = text.strip()
+    command = db.query(Command).filter(Command.keyword == keyword).first()
+    if command:
+        response_text = command.full_command
+    else:
+        response_text = "Command not found."
+
+    response = {"response_type": "ephemeral", "text": response_text}
+    return response
+
 
 @app.post("/commands_all")
-async def get_commands(db: Session = Depends(get_db)):
+async def commands_all(db: Session = Depends(get_db)):
     try:
+        # データベースからすべてのコマンドを取得
         commands = db.query(Command).all()
-        return commands
+        
+        # コマンドをJSON形式で作成
+        commands_json = [
+            {"keyword": command.keyword, "full_command": command.full_command}
+            for command in commands
+        ]
+        
+        return {"commands_all": commands_json}
+    
     except SQLAlchemyError as e:
         error_message = f"データベースエラーが発生しました: {str(e)}"
         raise HTTPException(
-            status_code=HTTP_500_INTERNAL_SERVER_ERROR, detail=error_message
+            status_code=500, detail=error_message
         )
     except Exception as e:
         error_message = f"予期せぬエラーが発生しました: {str(e)}"
         raise HTTPException(
-            status_code=HTTP_500_INTERNAL_SERVER_ERROR, detail=error_message
+            status_code=500, detail=error_message
         )
 
 
@@ -102,28 +123,6 @@ async def add_command(text: str = Form(...), db: Session = Depends(get_db)):
             raise HTTPException(status_code=400, detail="Database integrity error.")
 
     return {"message": "Command added successfully"}
-
-
-@app.post("/send_message")
-async def send_message(channel_id: str, message: str):
-    try:
-        response = slack_client.chat_postMessage(channel=channel_id, text=message)
-        return {"message": "Message sent", "ts": response["ts"]}
-    except SlackApiError as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error sending message: {e.response['error']}"
-        )
-
-
-@app.post("/read_messages")
-async def read_messages(channel_id: str, limit: int = 10):
-    try:
-        response = slack_client.conversations_history(channel=channel_id, limit=limit)
-        return response["messages"]
-    except SlackApiError as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error reading messages: {e.response['error']}"
-        )
 
 
 if __name__ == "__main__":
