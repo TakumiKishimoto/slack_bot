@@ -76,7 +76,6 @@ async def commands_all(db: Session = Depends(get_db)):
         # データベースからすべてのコマンドを取得
         commands = db.query(Command).all()
 
-        # 改行を含む文字列を作成
         commands_text = "".join(
             [
                 f"keyword: {command.keyword},full_command: {command.full_command}"
