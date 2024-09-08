@@ -24,6 +24,10 @@ class CommandRequest(BaseModel):
     full_command: str
 
 
+class DeleteCommand(BaseModel):
+    keyword: str
+
+
 # データベース依存関係
 def get_db():
     db = SessionLocal()
@@ -78,7 +82,7 @@ async def commands_all(db: Session = Depends(get_db)):
 
         commands_text = "".join(
             [
-                f"keyword: {command.keyword},full_command: {command.full_command}"
+                f"keyword: {command.keyword}, full_command: {command.full_command}"
                 for command in commands
             ]
         )
@@ -128,12 +132,13 @@ async def add_command(text: str = Form(...), db: Session = Depends(get_db)):
 
 
 @app.delete("/delete")
-async def delete_command(keyword: str, db: Session = Depends(get_db)):
-    command = db.query(Command).filter(Command.keyword == keyword).first()
-    if not command:
-        raise HTTPException(status_code=404, detail=f"No `{keyword}` found.")
+async def delete_command(command: DeleteCommand, db: Session = Depends(get_db)):
+    command_record = db.query(Command).filter(Command.keyword == command.keyword).first()
 
-    db.delete(command)
+    if not command_record:
+        raise HTTPException(status_code=404, detail=f"No `{command.keyword}` found.")
+
+    db.delete(command_record)
     db.commit()
     return {"message": "Command deleted successfully"}
 
