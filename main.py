@@ -125,6 +125,17 @@ async def add_command(text: str = Form(...), db: Session = Depends(get_db)):
     return {"message": "Command added successfully"}
 
 
+@app.delete("/delete")
+async def delete_command(keyword: str, db: Session = Depends(get_db)):
+    command = db.query(Command).filter(Command.keyword == keyword).first()
+    if not command:
+        raise HTTPException(status_code=404, detail=f"No `{keyword}` found.")
+
+    db.delete(command)
+    db.commit()
+    return {"message": "Command deleted successfully"}
+
+
 if __name__ == "__main__":
     import uvicorn
 
