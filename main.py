@@ -77,11 +77,13 @@ async def commands_all(db: Session = Depends(get_db)):
         commands = db.query(Command).all()
 
         # 改行を含む文字列を作成
-        commands_text = "\\n".join([
-            f"keyword: {command.keyword},full_command: {command.full_command}"
-            for command in commands
-        ])
-        
+        commands_text = "".join(
+            [
+                f"keyword: {command.keyword},full_command: {command.full_command}"
+                for command in commands
+            ]
+        )
+
         # 改行を含む文字列をJSON形式で返す
         return {"commands_all": commands_text}
 
