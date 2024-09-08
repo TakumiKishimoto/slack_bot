@@ -76,13 +76,14 @@ async def commands_all(db: Session = Depends(get_db)):
         # データベースからすべてのコマンドを取得
         commands = db.query(Command).all()
 
-        # コマンドをJSON形式で作成
-        commands_json = [
-            {"keyword": command.keyword, "full_command": command.full_command}
+        # 改行を含む文字列を作成
+        commands_text = "\\n".join([
+            f"keyword: {command.keyword},full_command: {command.full_command}"
             for command in commands
-        ]
-
-        return {"commands_all": commands_json}
+        ])
+        
+        # 改行を含む文字列をJSON形式で返す
+        return {"commands_all": commands_text}
 
     except SQLAlchemyError as e:
         error_message = f"データベースエラーが発生しました: {str(e)}"
