@@ -5,7 +5,7 @@ from fastapi import Depends, FastAPI, Form, HTTPException
 from pydantic import BaseModel
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
 
@@ -42,9 +42,7 @@ async def root():
 
 
 @app.post("/commands")
-async def commands(
-    token: str = Form(...), text: str = Form(...), db: Session = Depends(get_db)
-):
+async def commands(text: str = Form(...), db: Session = Depends(get_db)):
     keyword = text.strip()
     command = db.query(Command).filter(Command.keyword == keyword).first()
     if command:
@@ -75,7 +73,7 @@ async def get_commands(db: Session = Depends(get_db)):
 
 @app.post("/add_command")
 async def add_command(text: str = Form(...), db: Session = Depends(get_db)):
-    parts = text.split(maxsplit=1)  # 最大1回のスプリットで期待する形式に適応
+    parts = text.split(maxsplit=1)
     if len(parts) < 2:
         raise HTTPException(
             status_code=400,
@@ -86,9 +84,23 @@ async def add_command(text: str = Form(...), db: Session = Depends(get_db)):
     full_command = parts[1]
 
     command = Command(keyword=keyword, full_command=full_command)
-    db.add(command)
-    db.commit()
-    db.refresh(command)
+    try:
+        db.add(command)
+        db.commit()
+        db.refresh(command)
+    except IntegrityError as e:
+        db.rollback()
+
+        if "UNIQUE constraint failed" in str(
+            e.orig
+        ) or "duplicate key value violates unique constraint" in str(e.orig):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Command with keyword '{keyword}' already exists.",
+            )
+        else:
+            raise HTTPException(status_code=400, detail="Database integrity error.")
+
     return {"message": "Command added successfully"}
 
 
