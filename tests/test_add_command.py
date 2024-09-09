@@ -3,7 +3,7 @@ import requests
 
 def test_add_command():
     url = "http://localhost:8000/add_command"
-    data = {"text": "hello123 こんにちは、世界！"}
+    data = {"text": "hello hello world"}  # 追加するコマンドのキーワードとフルコマンドを指定します
     try:
         response = requests.post(url, data=data)
         response.raise_for_status()

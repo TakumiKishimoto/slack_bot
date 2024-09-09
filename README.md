@@ -1,198 +1,103 @@
-プロジェクトを詳細に説明したREADMEファイルを以下にまとめました。このREADMEは、プロジェクトの構造、セットアップ手順、および使用方法について説明しています。
-
-概要は[こちら](http://panoramic-clipper-620.notion.site)
----
 
 # Slackボット - キーワードに応じたコマンド提供
 
-このプロジェクトは、Slackボットを開発して、特定のキーワードをSlackに投げると、事前にデータベースに格納したフルコマンドを返す機能を提供します。また、ボットに新しいコマンドを格納できるようにもなります。
+このプロジェクトは、Slackボットを利用して、特定のキーワードに応じたコマンドをSlackチャット内で提供する機能を持っています。また、ボットに新しいコマンドを追加したり、既存のコマンドを削除することもできます。
 
 ## 目次
-1. [環境設定と必要なライブラリのインストール](#環境設定と必要なライブラリのインストール)
-2. [FastAPIアプリケーションの設定](#fastapiアプリケーションの設定)
-3. [データベースモデルの定義](#データベースモデルの定義)
-4. [Slackアプリケーションの設定とスコープの設定](#slackアプリケーションの設定とスコープの設定)
-5. [主要エンドポイントの実装](#主要エンドポイントの実装)
-6. [アプリケーションの起動とテスト](#アプリケーションの起動とテスト)
-7. [構成図](#構成図)
+1. [機能概要](#機能概要)
+2. [環境設定とインストール](#環境設定とインストール)
+3. [使い方](#使い方)
+4. [主要エンドポイントの説明](#主要エンドポイントの説明)
+5. [Slack APIの設定](#slack-apiの設定)
+6. [ローカルでのテスト](#ローカルでのテスト)
+7. [RenderへのデプロイとSlack設定](#renderへのデプロイとslack設定)
 
-## 環境設定と必要なライブラリのインストール
 
-まず、プロジェクトディレクトリを作成し、必要なライブラリをインストールします。
+## 機能概要
 
-```bash
-mkdir slack_bot_project
-cd slack_bot_project
-python -m venv venv
-source venv/bin/activate  # Windowsの場合は `venv\Scripts\activate`
-pip install fastapi uvicorn slack_sdk sqlalchemy databases python-dotenv
-```
+- **コマンド取得**: Slackで指定したキーワードに関連するフルコマンドを取得できます。
+- **すべてのコマンドの取得**: データベースに保存されたすべてのコマンドを取得し、一覧表示できます。
+- **コマンドの追加**: 新しいコマンドをデータベースに追加できます。
+- **コマンドの削除**: 既存のコマンドをデータベースから削除できます。
 
-## FastAPIアプリケーションの設定
+## 環境設定とインストール
 
-プロジェクトディレクトリに以下のファイルを作成します：`main.py`, `models.py`, `.env`
+1. このリポジトリをクローンします。
 
-**`main.py`** (FastAPIアプリケーションのメインエントリーポイント)
+    ```bash
+    git clone https://github.com/TakumiKishimoto/slack_bot.git
+    cd slack_bot
+    ```
 
-```python
-import os
-from fastapi import FastAPI, HTTPException, Depends, Form
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
-from slack_sdk import WebClient
-from slack_sdk.errors import SlackApiError
-from models import SessionLocal, Command, init_db
-from dotenv import load_dotenv
+2. Poetryを使って依存関係をインストールします。
 
-# 環境変数を読み込む
-load_dotenv()
+    ```bash
+    poetry install
+    ```
 
-app = FastAPI()
-slack_token = os.getenv("SLACK_BOT_TOKEN")
-slack_client = WebClient(token=slack_token)
+3. 次に、Slack APIの設定を行い、発行されたトークンを`.env` ファイルに書き込みます。
 
-init_db()
+## Slack APIの設定
 
-# Pydanticモデル
-class CommandRequest(BaseModel):
-    keyword: str
-    full_command: str
+1. **Slackアプリの作成**:
+   - [Slack API](https://api.slack.com/) にアクセスして、ログイン後「Your Apps」から「Create New App」をクリックします。
+   - 「From scratch」を選択し、アプリ名とインストールするワークスペースを指定します。
+   
+2. **OAuth & Permissions**:
+   - 左側のメニューから「OAuth & Permissions」を選択し、**Bot Token Scopes**セクションで以下のスコープを追加します。
+     - `commands`: Slashコマンドを使用するために必要です。
+     - `chat:write`: ボットがメッセージを送信するために必要です。
+   - スコープ追加後、「Install to Workspace」をクリックしてワークスペースにインストールし、発行された**ボットトークン**をコピーします。
 
-# データベース依存関係
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+3. **Slash Commands の作成**:
+   - 左側のメニューから「Slash Commands」を選択し、「Create New Command」をクリックします。
+   - コマンド情報を入力します:
+     - **Command**: 使用するコマンド名（例: `/command`）
+     - **Request URL**: デプロイしたアプリケーションのエンドポイント（例: `https://your-app-name.onrender.com/command`）
+     - **Short Description**: コマンドの説明
+     - **Usage Hint**: コマンドの使い方のヒント（例: `/command keyword`）
 
-@app.get("/")
-async def root():
-    return {"message": "Hello, FastAPI is running!"}
+4. **環境変数ファイルにトークンを設定**:
+   - Slack APIから取得したボットトークンを使い、`.env` ファイルに以下のように書き込みます。
 
-@app.post("/commands")
-async def commands(token: str = Form(...), text: str = Form(...), db: Session = Depends(get_db)):
-    keyword = text.strip()
-    command = db.query(Command).filter(Command.keyword == keyword).first()
-    if command:
-        response_text = command.full_command
-    else:
-        response_text = "Command not found."
+    ```plaintext
+    SLACK_BOT_TOKEN=xoxb-your-slack-bot-token
+    ```
+## ローカルでのテスト
 
-    response = {
-        "response_type": "in_channel",
-        "text": response_text
-    }
-    return response
+1. **ローカルサーバーの起動**:
+   - 以下のコマンドを実行して、ローカルサーバーを起動します。
 
-@app.post("/add_command")
-async def add_command(text: str = Form(...), db: Session = Depends(get_db)):
-    parts = text.split(maxsplit=1)  # 最大1回のスプリットで期待する形式に適応
-    if len(parts) < 2:
-        raise HTTPException(status_code=400, detail="Invalid command format. Use /addcommand keyword full_command.")
-    
-    keyword = parts[0]
-    full_command = parts[1]
-    
-    command = Command(keyword=keyword, full_command=full_command)
-    db.add(command)
-    db.commit()
-    db.refresh(command)
-    return {"message": "Command added successfully"}
+    ```bash
+    poetry run python main.py
+    ```
 
-if __name__ == '__main__':
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
-```
+2. **テストコードの実行**:
+   - プロジェクトには、Slackボットの機能をテストするための簡単なテストスクリプトが含まれています。以下のコマンドでテストを実行できます。
 
-## データベースモデルの定義
+    ```bash
+    poetry run python tests/add_commands.py
+    ```
 
-**`models.py`** (データベースモデルの定義)
+   - このテストスクリプトは、ローカルサーバーでのコマンドの追加、取得、削除が正しく動作するかを確認します。
 
-```python
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+3. **テスト結果の確認**:
+   ![実行結果の様子](img/local_test2.png)
+   ![実行結果の様子](img/local_test1.png)
+   
+   - これで、Slackボットの使用が可能になり、コマンドを実行した際に応答が返されるようになります。ローカルでのテストにより、実際の環境にデプロイする前に機能が正常に動作するか確認できます。
 
-DATABASE_URL = "sqlite:///./test.db"
+## RenderへのデプロイとSlack設定
 
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+1. **Renderへのデプロイ**:
+   - Renderのアカウントにログインし、新しいウェブサービスを作成します。
+   - GitHubリポジトリからこのプロジェクトを選択し、サービスをデプロイします。
+   - デプロイ後、Renderから提供されるURLをコピーしておきます。
 
-Base = declarative_base()
+2. **Slack設定の更新**:
+   - 先ほど取得したRenderのURLをSlackの「Slash Commands」設定に貼り付け、Slackとアプリケーションの連携を有効にします。
 
-class Command(Base):
-    __tablename__ = "commands"
 
-    id = Column(Integer, primary_key=True, index=True)
-    keyword = Column(String, unique=True, index=True, nullable=False)
-    full_command = Column(String, nullable=False)
 
-def init_db():
-    Base.metadata.create_all(bind=engine)
-```
-
-## 環境変数の設定
-
-**`.env`** (環境変数) ファイルを作成し、以下の内容を記述します：
-
-```plaintext
-SLACK_BOT_TOKEN=xoxb-your-slack-bot-token
-```
-
-## データベースの初期化
-
-以下のコマンドを実行してデータベースを初期化します：
-
-```bash
-python
->>> from models import init_db
->>> init_db()
-```
-
-## Slackアプリケーションの設定とスコープの設定
-
-1. [Slack API](https://api.slack.com/) にアクセスし、「Create New App」をクリック。
-2. 「From scratch」を選択。
-3. アプリの名前を設定し、インストールするワークスペースを選択。
-4. 「Slash Commands」を選択し、「Create New Command」をクリック。以下の情報を入力：
-   - **Command:** `/your_command_here`
-   - **Request URL:** `http://your-server-url/commands`
-   - **Short Description:** "Triggers a custom command"
-   - **Usage Hint:** `[keyword]`
-
-5. 必要なスコープを設定（`chat:write`, `commands`, など）。
-6. OAuth & Permissionsでスコープを追加し、アプリをワークスペースにインストール。
-7. 得られたトークンを `.env` ファイルに保存。
-
-## 主要エンドポイントの実装
-
-主要なCRUD操作を提供するエンドポイント `commands` や `add_command` およびその他のユーティリティエンドポイントを設定します。
-
-## アプリケーションの起動とテスト
-
-ローカル環境でテストする場合、以下のコマンドを使用してアプリケーションを起動します：
-
-```bash
-uvicorn main:app --reload
-```
-
-その後、Slackのスラッシュコマンドインターフェースを使って適切にコマンドが機能することを確認します。
-
-## 構成図
-
-プロジェクトのディレクトリ構造は以下のようになります：
-
-```
-slack_bot_project/
-│
-├── main.py          : FastAPIアプリケーションのエントリーポイント
-├── models.py        : データベースモデル定義
-├── .env             : 環境変数ファイル（Slackトークンなど）
-├── venv/            : 仮想環境ディレクトリ
-└── test.db          : SQLiteデータベースファイル
-```
 
 ---
-
-このREADMEファイルを使ってプロジェクトをセットアップし、Slackボットが特定のキーワードに応じてデータベースに格納されたフルコマンドを返す機能を動かしましょう。また、新しいコマンドを追加するためのスラッシュコマンドを使って、機能を拡張することができます。
